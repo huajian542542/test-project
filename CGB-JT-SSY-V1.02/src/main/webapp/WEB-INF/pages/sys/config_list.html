@@ -1,0 +1,213 @@
+<div class="row">
+	<div class="col-xs-12">
+		<div class="box">
+			<div class="box-header">
+				<h3 class="box-title">配置管理</h3>
+
+				<div class="box-tools">
+					<div class="input-group input-group-sm" style="width: 350px;">
+						<input type="text" name="table_search" id="searchNameId"
+							class="form-control pull-right" placeholder="参数名">
+
+						<div class="input-group-btn">
+							<button type="button" class="btn btn-default btn-search">
+								<i class="fa fa-search"></i>
+							</button>
+
+							<button type="button" class="btn btn-default btn-delete">删除</button>
+							<button type="button" class="btn btn-default btn-add">添加</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- /.box-header -->
+			<div class="box-body table-responsive no-padding">
+				<form>
+					<table class="table table-hover">
+						<thead>
+							<tr>
+								<th><input type="checkbox" id="checkAll">全选</th>
+								<th>参数名</th>
+								<th>参数值</th>
+								<th>创建日期</th>
+								<th>修改日期</th>
+								<th>操作</th>
+							</tr>
+						</thead>
+						<tbody id="tbodyId">
+						</tbody>
+					</table>
+				</form>
+			</div>
+			<!-- /.box-body -->
+			<div id="pageId" class="box-footer clearfix"></div>
+		</div>
+		<!-- /.box -->
+	</div>
+</div>
+<script type="text/javascript">
+	$(function(){
+		 $("#pageId").load("doPageUI.do",function(){
+			doGetObjects();
+		 });
+		 //添加查询的点击事件
+		 $(".input-group-btn")
+		 .on("click",".btn-search",doQueryObjects)
+		 .on("click", ".btn-delete", doDeleteObjects)
+		 //为添加按钮添加点击事件
+		 .on("click",".btn-add",doShowEditDialog);
+		$("thead").on("change","#checkAll",doCheckAll);
+				//处理tbody中所有CheckBox对象的点击事件
+		$("tbody").on("change",".cBox",doChangeCheckAllState);
+		//添加保存信息的点击事件
+		//$("#myModal").on("click",".btn-save",doSaveOrUpdate);
+		//添加更新信息的点击事件
+		$("#tbodyId").on("click",".btn-update",doShowEditDialog);
+		
+	});
+
+
+	/*以模态框的形式显示编辑页面*/
+	function doShowEditDialog(){
+		var title;
+		 //基于点击对象的类选择器判定是添加还是修改
+		 if($(this).hasClass("btn-add")){
+			 title="添加参数";
+		 }else if($(this).hasClass("btn-update")){
+			 title="修改参数";
+			 var rowData=$(this).parents("tr").data("rowData");
+			  //将当前行记录绑定到模态框上
+		   //为什么要绑定到此对象?后续编辑页面可以直接从此对象直接获取数据
+			$("#myModal").data("rowData",rowData);
+		 }
+		var url="config/doConfigEditUI.do";
+		$("#myModal .modal-body").load(url,function(){
+			$("#myModalLabel").html(title);
+			$("#myModal").modal('show');
+		});
+	}
+	function doChangeCheckAllState(){
+		//1.设定默认状态值
+	var flag=true;
+	//2.迭代所有tbody中的checkbox值并进行与操作
+	$("#tbodyId input[name='cItem']").each(function(){
+		flag=flag && $(this).prop("checked");
+	});
+	//3.修改全选元素checkbox的值为flag
+	$("#checkAll").prop("checked",flag);
+	}
+	function doCheckAll(){
+		//1.获取当前点击对象的checked属性的值
+		var flag=$(this).prop("checked");//true or false
+		$("#tbodyId input[name='cItem']").prop("checked",flag);
+	}
+	function doDeleteObjects(){
+		var ids=doGetCheckedIds();
+		if(ids.length==0){
+			alert("至少选择一个!!")
+			return;
+		}
+		var params={"ids":ids.toString()};
+		var url="config/doDeleteObjects/"+ids.toString()+".do";
+		$.post(url,function(result){
+			if(result.state==1){
+				alert(result.message);
+				doGetObjects();
+			}else{
+				alert(result.message);
+			}
+		});
+	}
+	function doGetCheckedIds(){
+		//定义一个数组
+		var array=[];
+		$("#tbodyId input[type='checkbox']").each(function(){
+			if($(this).prop("checked")){
+				array.push($(this).val());
+				console.log(array.toLocaleString());
+			}
+		});
+		return array;
+	}
+	function doQueryObjects(){
+		//为什么要在此位置初始化pageCurrent的值为1?
+	   //数据查询时页码的初始位置也应该是第一页
+	   $("#pageId").data("pageCurrent",1);
+	   //为什么要调用doGetObjects函数？
+	   //重用js代码，简化jS代码编写。
+	   doGetObjects();
+
+	}
+
+	function doGetObjects(){
+		 //1.定义url和参数
+		   var url="config/doFindPageObjects.do"
+			 //? 请问data函数的含义是什么？(从指定元素上获取绑定的数据)
+			   //此数据会在何时进行绑定？(setPagination,doQueryObjects)
+			   var pageCurrent=$("#pageId").data("pageCurrent");
+			   //为什么要执行如下语句的判定，然后初始化pageCurrent的值为1
+			   //pageCurrent参数在没有赋值的情况下，默认初始值应该为1.
+			   if(!pageCurrent) pageCurrent=1;
+			   var params={"pageCurrent":pageCurrent};
+			   var name=$("#searchNameId").val();
+	   //如下语句的含义是什么？动态在js对象中添加key/value,
+	  	 if(name) params.name=name;//查询时需要
+
+			 //2.发起异步请求
+			   //请问如下ajax请求的回调函数参数名可以是任意吗？可以,必须符合标识符的规范
+		       $.getJSON(url,params,function(result){
+		//JsonResult->PageObject->List<SysConfigs>+...
+				   //请问result是一个字符串还是json格式的js对象？对象
+		    	        doHandleResponseResult(result);
+		       });
+	}
+	function doHandleResponseResult(result){
+			if(result.state==1){
+				//更新table中tbody内部的数据
+		doSetTableBodyRows(result.data.records);//将数据呈现在页面上 
+		//更新页面page.html分页数据
+		doSetPagination(result.data);
+			}else{
+				alert(result.message);
+			}
+	}
+	function doSetTableBodyRows(records){
+		 //1.获取tbody对象，并清空对象
+		 var tBody=$("#tbodyId");
+	   tBody.empty();
+		for(var i in records){
+			 //2.1 构建tr对象
+			 var tr=$("<tr></tr>");
+			 //绑定当前行数据到tr
+			 tr.data("rowData",records[i]);//修改时需要
+		   //2.2 构建tds对象
+		   var tds=createdTds(records[i]);
+		   //2.3 将tds追加到tr中
+		   tr.append(tds);
+		   //2.4 将tr追加到tbody中
+		   tBody.append(tr);
+
+		}
+	}
+	function createdTds(row){
+		var tds="<td><input type='checkbox' class='cBox' name='cItem' value='"+row.id+"'></td>"+
+		   "<td>"+row.name+"</td>"+
+		   "<td>"+row.value+"</td>"+
+		   "<td>"+new Date(row.createdTime).toLocaleDateString()+"</td>"+
+		   "<td>"+new Date(row.modifiedTime).toLocaleDateString()+"</td>"+
+           "<td><button type='button' class='btn btn-default  btn-update'>update</button></td>";
+			return tds;
+	}
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
