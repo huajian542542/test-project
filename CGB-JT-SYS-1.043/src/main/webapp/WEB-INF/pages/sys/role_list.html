@@ -1,0 +1,192 @@
+<div class="row">
+	<div class="col-xs-12">
+		<div class="box">
+			<div class="box-header">
+				<h3 class="box-title">角色管理</h3>
+
+				<div class="box-tools">
+					<div class="input-group input-group-sm" style="width: 350px;">
+						<input type="text" name="table_search" id="searchNameId"
+							class="form-control pull-right" placeholder="角色名">
+
+						<div class="input-group-btn">
+							<button type="button" class="btn btn-default btn-search">
+								<i class="fa fa-search"></i>
+							</button>
+							<button type="button" class="btn btn-default btn-add">添加</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- /.box-header -->
+			<div class="box-body table-responsive no-padding">
+				<form>
+					<table class="table table-hover">
+						<thead>
+							<tr>
+								<th>角色名称</th>
+								<th>备注</th>
+								<th>创建时间</th>
+								<th>修改时间</th>
+								<th>创建用户</th>
+								<th>修改用户</th>
+								<th>操作</th>
+							</tr>
+						</thead>
+						<tbody id="tbodyId">
+						</tbody>
+					</table>
+				</form>
+			</div>
+			<!-- /.box-body -->
+			<div id="pageId" class="box-footer clearfix"></div>
+		</div>
+		<!-- /.box -->
+	</div>
+</div>
+<script type="text/javascript">
+   $(function(){
+	$("#pageId").load("doPageUI.do",function(){
+		 //异步加载服务端数据然后进行呈现
+		 doGetObjects();
+	});
+	$(".input-group-btn").on("click",".btn-search",doQueryObjects)
+	.on("click",".btn-add",doLoadEditUI);
+	$("#tbodyId").on("click",".btn-delete",doDeleteObject)
+				.on("click",".btn-update",doLoadEditUI);
+	
+   });
+   function doLoadEditUI(){
+	   var title ;
+	   if($(this).hasClass("btn-add")){
+		   title="角色添加";
+		   loadPageUI(title);
+	   }else{
+		   title="角色修改：";
+		   var id = $(this).parents("tr").data("id");
+		   console.log("doLoadEditUI--id,ids:"+id,ids);
+		   var url="role/doFindObjectById.do";
+		   var data = {"id":id};
+		   $.getJson(url,data,function(result){
+			   if(result.state==1){
+					//此位置除了要分析正确还要考虑对象不存在的情况
+					$("#mainContentId").data("data",result.data)
+					loadPageUI(title);
+					}else{
+					 alert(result.message);
+					}
+		   });
+	   }
+	   
+   }
+   function loadPageUI(title){
+	   $("#mainContentId")
+		  .load("role/doRoleEditUI.do",function(){
+			  $(".box-title").html(title);
+	   }); 
+   }
+   function doDeleteObject(){
+	   //debugger
+	   var id=$(this).parents("tr").attr("id");
+	   console.log("id:"+id);
+	   var params={id:id};
+	   var url="role/doDeleteObject.do";
+	   $.post(url,params,function(result){
+		   if(result.state==1){
+			   alert(result.message);
+			   doGetObjects();
+		   }else{
+			   alert(result.message);
+		   }
+	   });
+   }
+   function doQueryObjects(){
+	   $("#pageId").data("pageCurrent",1);
+	   doGetObjects();
+   }
+   //定义分页查询函数
+   function doGetObjects(){
+	  // debugger
+	//1.定义url和参数
+	var url="role/doFindPageObjects.do";
+	//? 请问data函数的含义是什么？(从指定元素上获取绑定的数据)
+	   //此数据会在何时进行绑定？(setPagination,doQueryObjects)
+	var pageCurrent=$("#pageId").data("pageCurrent");
+	//为什么要执行如下语句的判定，然后初始化pageCurrent的值为1
+	   //pageCurrent参数在没有赋值的情况下，默认初始值应该为1.
+	if(!pageCurrent) pageCurrent=1;
+	var params={"pageCurrent":pageCurrent};
+	var name=$("#searchNameId").val();
+	   //如下语句的含义是什么？动态在js对象中添加key/value,
+	if(name) params.name=name;//查询时需要
+		console.log("parames:"+params);
+	//2.发起异步请求
+	   //请问如下ajax请求的回调函数参数名可以是任意吗？可以,必须符合标识符的规范
+	$.getJSON(url,params,function(result){
+		//JsonResult->PageObject->List<SysConfigs>+...
+		   //请问result是一个字符串还是json格式的js对象？对象
+		   doHandleResponseResult(result);
+	});
+   }
+   function   doHandleResponseResult(result){
+	   console.log(result);
+	if(result.state==1){
+		  doSetTableBodyRows(result.data.records);
+		  doSetPagination(result.data);
+	   }else{
+		  doSetTableBodyErrors(result.message);
+	   }
+   };
+function doSetTableBodyRows(records){
+	//console.log("records:"+records);
+	console.log("records.id:"+records.id);
+	 //1.获取tbody对象，并清空对象
+	 var tBody=$("#tbodyId");
+	 tBody.empty();
+	 //2.迭代records记录，并将其内容追加到tbody
+	 for(var i in records){
+		 //2.1 构建tr对象
+		 var tr=$("<tr></tr>");
+		 //2.2 构建tds对象
+		 var tds=doCreatedTds(records[i]);
+		  //2.3 将tds追加到tr中
+		  tr.append(tds);
+		  tBody.append(tr);
+	 }
+}
+function doCreatedTds(row){
+	var tds="<td>"+row.name+"</td>"+
+       "<td>"+row.note+"</td>"+
+       "<td>"+new Date(row.createdTime).toLocaleString()+"</td>"+
+       "<td>"+new Date(row.modifiedTime).toLocaleString()+"</td>"+
+       "<td>"+row.createdUser+"</td>"+
+       "<td>"+row.modifiedUser+"</td>"+
+       "<td><a class='btn-delete'>delete</a>"+
+       "&nbsp;<a class='btn-update'>update</a></td>";
+       return tds;
+}
+function doSetTableBodyErrors(message){
+	var tBody=$("#tbodyId");
+	tBody.empty();
+	var tr=$("<tr></tr>");
+	//创建td对象
+	   //var len=$("table thead").find("tr").find("th").length;
+	   var len=$("table th").length;
+	var td=$("<td></td>");
+	td.prop("colspan",len);
+	td.append(message);
+	tr.append(td);
+	tBody.append(tr);
+}
+</script>
+
+
+
+
+
+
+
+
+
+
+
